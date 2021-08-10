@@ -14,6 +14,8 @@ import { CONFIG } from '../config';
 
 const EthCrypto = require('eth-crypto');
 
+
+
 async function createWeb3() {
     // Modern dapp browsers...
     if ((window as any).ethereum) {
@@ -50,8 +52,10 @@ export function App() {
     const [storedValue, setStoredValue] = useState<number | undefined>();
     const [deployTxHash, setDeployTxHash] = useState<string | undefined>();
     const [polyjuiceAddress, setPolyjuiceAddress] = useState<string | undefined>();
+    const [layer2Address, setLayer2Address] = useState<string | undefined>();
     const [transactionInProgress, setTransactionInProgress] = useState(false);
     const [diary, setDiary] = useState<any | undefined>();
+    const [sudtBalance, setSudtBalance] = useState<number | 0>();
     const toastId = React.useRef(null);
     const [newStoredInputValue, setNewStoredInputValue] = useState<
         string | undefined
@@ -89,6 +93,29 @@ export function App() {
 
     const account = accounts?.[0];
 
+
+    async function getLater2Address(account: string, web3: Web3) {
+        const addressTranslator = new AddressTranslator();
+        const depositAddress = await addressTranslator.getLayer2DepositAddress(web3, account);
+        console.log(depositAddress.addressString)
+        return depositAddress.addressString
+    }
+
+    // we only need the balanceOf
+    const CompiledContractArtifact = require(`../abi/ERC20.json`);
+
+    const SUDT_PROXY_CONTRACT_ADDRESS = "0xE674ae36a9242Ca285E1BBcf8e9973B4B72C0333";
+
+    async function getSUDTBalance(account: string, web3: Web3, polyjuiceAddress:string) {
+        console.log(polyjuiceAddress);
+        const contract = new web3.eth.Contract(CompiledContractArtifact.abi, SUDT_PROXY_CONTRACT_ADDRESS);
+        const balance = await contract.methods.balanceOf(polyjuiceAddress).call({
+            from: account
+        })
+        console.log(balance);
+
+        return balance
+    }
 
     async function deployContract() {
         const _contract = new DiaryWrapper(web3);
@@ -200,6 +227,12 @@ export function App() {
             if (_accounts && _accounts[0]) {
                 const _l2Balance = BigInt(await _web3.eth.getBalance(_accounts[0]));
                 setL2Balance(_l2Balance);
+                const l2Address = await getLater2Address(_accounts[0], _web3);
+                setLayer2Address(l2Address);
+                const addressTranslator = new AddressTranslator();
+                const polyjuiceAddress = addressTranslator.ethAddressToGodwokenShortAddress(_accounts[0]);
+                const balance = await getSUDTBalance(_accounts[0], _web3, polyjuiceAddress);
+                setSudtBalance(balance);
             }
 
             console.log(_accounts[0])
@@ -215,10 +248,14 @@ export function App() {
             <br />
             Your Polyjuice address: <b>{polyjuiceAddress || ' - '}</b>
             <br />
+            Your Layer 2 Deposit Address on Layer 1: <b>{layer2Address}</b>
+            <br />
+            use <a href="https://force-bridge-test.ckbapp.dev/bridge/Ethereum/Nervos">nervos bridge</a> to transfer token to layer2
             <br />
             Nervos Layer 2 balance:{' '}
             <b>{l2Balance ? (l2Balance / 10n ** 8n).toString() : <LoadingIndicator />} CKB</b>
             <br />
+            Your SUDT balance: {sudtBalance}
             <br />
             Deployed contract address: <b>{contract?.address || '-'}</b> <br />
             Deploy transaction hash: <b>{deployTxHash || '-'}</b>
