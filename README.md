@@ -1,4 +1,4 @@
-# gitcoin7 hackathon
+# gitcoin8 hackathon
 
 ## Start UI:
 
